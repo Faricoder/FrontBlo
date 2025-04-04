@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Box, Typography, Button, Container } from "@mui/material";
+import { Box, Typography, Button } from "@mui/material";
 import "./Home.css";
 
 function Home() {

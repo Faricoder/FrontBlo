@@ -2,6 +2,8 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router-dom";
 import "./Saveurs.css";
+import UserForm from "../components/UserForm";
+import CommentForm from "../components/CommentForm";
 
 // Import des images
 import quicheLorraine from '../assets/Quiche_Lorraine.jpg';
@@ -23,11 +25,32 @@ interface Recette {
 	image_url: string;
 }
 
+interface Comment {
+	id_commentaire: number;
+	id_recette: number;
+	id_utilisateur: number;
+	contenu: string;
+	date_commentaire: string;
+	nom_utilisateur: string;
+}
+
+interface User {
+	id_utilisateur: number;
+	nom_utilisateur: string;
+	email: string;
+	mot_de_passe: string;
+	bio: string;
+}
+
 function Saveurs() {
 	const resultLoaderRecettes = useLoaderData() as { data: Recette[] };
 	const [recettes, setRecettes] = useState<Recette[]>(resultLoaderRecettes.data);
 	const [loading, setLoading] = useState(true);
 	const [selectedRecette, setSelectedRecette] = useState<Recette | null>(null);
+	const [comments, setComments] = useState<{ [key: number]: Comment[] }>({});
+	const [showUserForm, setShowUserForm] = useState(false);
+	const [currentUser, setCurrentUser] = useState<User | null>(null);
+	const [editingComment, setEditingComment] = useState<Comment | null>(null);
 
 	// Fonction pour obtenir l'image correspondante
 	const getImage = (imageName: string) => {
@@ -49,6 +72,66 @@ function Saveurs() {
 		}
 	};
 
+	const fetchComments = async (recetteId: number) => {
+		try {
+			const response = await axios.get(`http://localhost:4242/api/comments/${recetteId}`);
+			setComments(prev => ({
+				...prev,
+				[recetteId]: response.data || []
+			}));
+		} catch (error) {
+			console.error('Erreur lors du chargement des commentaires:', error);
+			setComments(prev => ({
+				...prev,
+				[recetteId]: []
+			}));
+		}
+	};
+
+	const handleDeleteComment = async (commentId: number) => {
+		try {
+			await axios.delete(`http://localhost:4242/api/comments/${commentId}`);
+			// Recharger les commentaires après la suppression
+			if (selectedRecette) {
+				const response = await axios.get(`http://localhost:4242/api/comments/${selectedRecette.id_recette}`);
+				setComments(response.data);
+			}
+		} catch (error) {
+			console.error('Erreur lors de la suppression du commentaire:', error);
+		}
+	};
+
+	const handleEditComment = (comment: Comment) => {
+		setEditingComment(comment);
+	};
+
+	const handleCommentSuccess = (recetteId: number) => {
+		fetchComments(recetteId);
+		setEditingComment(null);
+	};
+
+	const handleUserSuccess = () => {
+		setShowUserForm(false);
+		// Recharger les données utilisateur si nécessaire
+	};
+
+	const handleLogin = async (email: string, mot_de_passe: string) => {
+		try {
+			const response = await axios.post('http://localhost:4242/api/users/login', {
+				email,
+				mot_de_passe
+			});
+			setCurrentUser(response.data);
+			setShowUserForm(false);
+		} catch (error) {
+			console.error('Erreur lors de la connexion:', error);
+		}
+	};
+
+	const handleLogout = () => {
+		setCurrentUser(null);
+	};
+
 	useEffect(() => {
 		axios
 			.get("http://localhost:4242/api/saveurs/")
@@ -62,6 +145,12 @@ function Saveurs() {
 			});
 	}, []);
 
+	useEffect(() => {
+		if (selectedRecette) {
+			fetchComments(selectedRecette.id_recette);
+		}
+	}, [selectedRecette]);
+
 	if (loading) {
 		return (
 			<div className="loading-container">
@@ -72,6 +161,31 @@ function Saveurs() {
 
 	return (
 		<div className="recettes-container">
+			<div className="user-actions">
+				{currentUser ? (
+					<div className="user-info">
+						<span>Connecté en tant que: {currentUser.nom_utilisateur}</span>
+						<button onClick={() => setShowUserForm(true)}>Modifier mon profil</button>
+						<button onClick={handleLogout}>Déconnexion</button>
+					</div>
+				) : (
+					<button onClick={() => setShowUserForm(true)}>S'inscrire / Se connecter</button>
+				)}
+			</div>
+
+			{showUserForm && (
+				<div className="modal-overlay" onClick={() => setShowUserForm(false)}>
+					<div className="modal-content" onClick={e => e.stopPropagation()}>
+						<UserForm
+							user={currentUser}
+							onSuccess={handleUserSuccess}
+							onCancel={() => setShowUserForm(false)}
+							onLogin={handleLogin}
+						/>
+					</div>
+				</div>
+			)}
+
 			<h1 className="recettes-title">Mes Recettes</h1>
 			<div className="recettes-grid">
 				{recettes.map((recette) => (
@@ -126,6 +240,39 @@ function Saveurs() {
 							<div className="instructions">
 								<h3>Instructions:</h3>
 								<p>{selectedRecette.instructions}</p>
+							</div>
+
+							<div className="comments-section">
+								<h3>Commentaires</h3>
+								{currentUser && (
+									<CommentForm
+										recetteId={selectedRecette.id_recette}
+										userId={currentUser.id_utilisateur}
+										onSuccess={() => handleCommentSuccess(selectedRecette.id_recette)}
+										onCancel={() => setEditingComment(null)}
+										comment={editingComment || undefined}
+									/>
+								)}
+
+								<div className="comments-list">
+									{(comments[selectedRecette.id_recette] || []).map(comment => (
+										<div key={comment.id_commentaire} className="comment">
+											<div className="comment-header">
+												<span className="comment-author">{comment.nom_utilisateur}</span>
+												<span className="comment-date">
+													{new Date(comment.date_commentaire).toLocaleDateString()}
+												</span>
+											</div>
+											<p className="comment-content">{comment.contenu}</p>
+											{currentUser?.id_utilisateur === comment.id_utilisateur && (
+												<div className="comment-actions">
+													<button onClick={() => handleEditComment(comment)}>Modifier</button>
+													<button onClick={() => handleDeleteComment(comment.id_commentaire)}>Supprimer</button>
+												</div>
+											)}
+										</div>
+									))}
+								</div>
 							</div>
 						</div>
 					</div>
