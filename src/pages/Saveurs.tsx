@@ -6,12 +6,12 @@ import UserForm from "../components/UserForm";
 import CommentForm from "../components/CommentForm";
 
 // Import des images
-import quicheLorraine from '../assets/Quiche_Lorraine.jpg';
-import tarteFraises from '../assets/Tarte_aux_fraises.jpg';
-import asperges from '../assets/asperges-sauce-hollandaise.jpg';
-import saladeNicoise from '../assets/Salade_Niçoise.jpg';
-import soupePistou from '../assets/Soupe_au_pistou.jpg';
-import ratatouille from '../assets/ratatouille.jpg';
+import quicheLorraine from "../assets/Quiche_Lorraine.jpg";
+import tarteFraises from "../assets/Tarte_aux_fraises.jpg";
+import asperges from "../assets/asperges-sauce-hollandaise.jpg";
+import saladeNicoise from "../assets/Salade_nicoise.jpg";
+import soupePistou from "../assets/Soupe_au_pistou.jpg";
+import ratatouille from "../assets/ratatouille.jpg";
 
 interface Recette {
 	id_recette: number;
@@ -42,107 +42,116 @@ interface User {
 	bio: string;
 }
 
+interface CommentsState {
+	[key: number]: Comment[];
+}
+
 function Saveurs() {
 	const resultLoaderRecettes = useLoaderData() as { data: Recette[] };
 	const [recettes, setRecettes] = useState<Recette[]>(resultLoaderRecettes.data);
 	const [loading, setLoading] = useState(true);
 	const [selectedRecette, setSelectedRecette] = useState<Recette | null>(null);
-	const [comments, setComments] = useState<{ [key: number]: Comment[] }>({});
+	const [comments, setComments] = useState<CommentsState>({});
 	const [showUserForm, setShowUserForm] = useState(false);
 	const [currentUser, setCurrentUser] = useState<User | null>(null);
 	const [editingComment, setEditingComment] = useState<Comment | null>(null);
 
-	// Fonction pour obtenir l'image correspondante
-	const getImage = (imageName: string) => {
-		switch(imageName) {
-			case 'Quiche_Lorraine.jpg':
+	const getImage = (imageName: string): string => {
+		if (!imageName) return quicheLorraine;
+
+		const normalizedName = imageName.trim().toLowerCase();
+
+		switch (normalizedName) {
+			case "quiche_lorraine.jpg":
 				return quicheLorraine;
-			case 'Tarte_aux_fraises.jpg':
+			case "tarte_aux_fraises.jpg":
 				return tarteFraises;
-			case 'asperges-sauce-hollandaise.jpg':
+			case "asperges-sauce-hollandaise.jpg":
 				return asperges;
-			case 'Salade_Niçoise.jpg':
+			case "salade_nicoise.jpg":
 				return saladeNicoise;
-			case 'Soupe_au_pistou.jpg':
+			case "soupe_au_pistou.jpg":
 				return soupePistou;
-			case 'ratatouille.jpg':
+			case "ratatouille.jpg":
 				return ratatouille;
 			default:
-				return quicheLorraine; // Image par défaut
+				console.warn(`Image non trouvée: ${imageName}, utilisation de l'image par défaut`);
+				return quicheLorraine;
 		}
 	};
 
-	const fetchComments = async (recetteId: number) => {
+	const fetchComments = async (recetteId: number): Promise<void> => {
 		try {
-			const response = await axios.get(`http://localhost:4242/api/comments/${recetteId}`);
-			setComments(prev => ({
+			const response = await axios.get<Comment[]>(
+				`http://localhost:4242/api/comments/${recetteId}`
+			);
+			setComments((prev) => ({
 				...prev,
-				[recetteId]: response.data || []
+				[recetteId]: response.data || [],
 			}));
 		} catch (error) {
-			console.error('Erreur lors du chargement des commentaires:', error);
-			setComments(prev => ({
+			console.error("Erreur lors du chargement des commentaires:", error);
+			setComments((prev) => ({
 				...prev,
-				[recetteId]: []
+				[recetteId]: [],
 			}));
 		}
 	};
 
-	const handleDeleteComment = async (commentId: number) => {
+	const handleDeleteComment = async (commentId: number): Promise<void> => {
 		try {
 			await axios.delete(`http://localhost:4242/api/comments/${commentId}`);
-			// Recharger les commentaires après la suppression
 			if (selectedRecette) {
-				const response = await axios.get(`http://localhost:4242/api/comments/${selectedRecette.id_recette}`);
-				setComments(response.data);
+				await fetchComments(selectedRecette.id_recette);
 			}
 		} catch (error) {
-			console.error('Erreur lors de la suppression du commentaire:', error);
+			console.error("Erreur lors de la suppression du commentaire:", error);
 		}
 	};
 
-	const handleEditComment = (comment: Comment) => {
+	const handleEditComment = (comment: Comment): void => {
 		setEditingComment(comment);
 	};
 
-	const handleCommentSuccess = (recetteId: number) => {
+	const handleCommentSuccess = (recetteId: number): void => {
 		fetchComments(recetteId);
 		setEditingComment(null);
 	};
 
-	const handleUserSuccess = () => {
+	const handleUserSuccess = (): void => {
 		setShowUserForm(false);
-		// Recharger les données utilisateur si nécessaire
 	};
 
-	const handleLogin = async (email: string, mot_de_passe: string) => {
+	const handleLogin = async (email: string, mot_de_passe: string): Promise<void> => {
 		try {
-			const response = await axios.post('http://localhost:4242/api/users/login', {
-				email,
-				mot_de_passe
-			});
+			const response = await axios.post<User>(
+				"http://localhost:4242/api/users/login",
+				{ email, mot_de_passe }
+			);
 			setCurrentUser(response.data);
 			setShowUserForm(false);
 		} catch (error) {
-			console.error('Erreur lors de la connexion:', error);
+			console.error("Erreur lors de la connexion:", error);
 		}
 	};
 
-	const handleLogout = () => {
+	const handleLogout = (): void => {
 		setCurrentUser(null);
 	};
 
 	useEffect(() => {
-		axios
-			.get("http://localhost:4242/api/saveurs/")
-			.then((res) => {
-				setRecettes(res.data);
+		const loadRecettes = async (): Promise<void> => {
+			try {
+				const response = await axios.get<Recette[]>("http://localhost:4242/api/saveurs/");
+				setRecettes(response.data);
 				setLoading(false);
-			})
-			.catch((error) => {
+			} catch (error) {
 				console.error("Erreur lors du chargement des recettes:", error);
 				setLoading(false);
-			});
+			}
+		};
+
+		loadRecettes();
 	}, []);
 
 	useEffect(() => {
@@ -175,7 +184,7 @@ function Saveurs() {
 
 			{showUserForm && (
 				<div className="modal-overlay" onClick={() => setShowUserForm(false)}>
-					<div className="modal-content" onClick={e => e.stopPropagation()}>
+					<div className="modal-content" onClick={(e) => e.stopPropagation()}>
 						<UserForm
 							user={currentUser}
 							onSuccess={handleUserSuccess}
@@ -189,8 +198,8 @@ function Saveurs() {
 			<h1 className="recettes-title">Mes Recettes</h1>
 			<div className="recettes-grid">
 				{recettes.map((recette) => (
-					<div 
-						key={recette.id_recette} 
+					<div
+						key={recette.id_recette}
 						className="recette-card"
 						onClick={() => setSelectedRecette(recette)}
 					>
@@ -198,23 +207,19 @@ function Saveurs() {
 							className="recette-image"
 							src={getImage(recette.image_url)}
 							alt={recette.titre}
+							onError={(e) => {
+								const target = e.target as HTMLImageElement;
+								target.src = quicheLorraine;
+							}}
 						/>
 						<div className="recette-content">
 							<h2 className="recette-title">{recette.titre}</h2>
 							<p className="recette-description">{recette.description}</p>
 							<div className="recette-tags">
-								<span className="tag">
-									Préparation: {recette.temps_preparation} min
-								</span>
-								<span className="tag">
-									Cuisson: {recette.temps_cuisson} min
-								</span>
-								<span className="tag tag-secondary">
-									{recette.difficulte}
-								</span>
-								<span className="tag tag-outlined">
-									{recette.saison}
-								</span>
+								<span className="tag">Préparation: {recette.temps_preparation} min</span>
+								<span className="tag">Cuisson: {recette.temps_cuisson} min</span>
+								<span className="tag tag-secondary">{recette.difficulte}</span>
+								<span className="tag tag-outlined">{recette.saison}</span>
 							</div>
 						</div>
 					</div>
@@ -223,13 +228,19 @@ function Saveurs() {
 
 			{selectedRecette && (
 				<div className="modal-overlay" onClick={() => setSelectedRecette(null)}>
-					<div className="modal-content" onClick={e => e.stopPropagation()}>
-						<button className="close-button" onClick={() => setSelectedRecette(null)}>×</button>
+					<div className="modal-content" onClick={(e) => e.stopPropagation()}>
+						<button className="close-button" onClick={() => setSelectedRecette(null)}>
+							×
+						</button>
 						<h2>{selectedRecette.titre}</h2>
-						<img 
+						<img
 							className="modal-image"
 							src={getImage(selectedRecette.image_url)}
 							alt={selectedRecette.titre}
+							onError={(e) => {
+								const target = e.target as HTMLImageElement;
+								target.src = quicheLorraine;
+							}}
 						/>
 						<div className="modal-details">
 							<p><strong>Description:</strong> {selectedRecette.description}</p>
@@ -255,7 +266,7 @@ function Saveurs() {
 								)}
 
 								<div className="comments-list">
-									{(comments[selectedRecette.id_recette] || []).map(comment => (
+									{(comments[selectedRecette.id_recette] || []).map((comment) => (
 										<div key={comment.id_commentaire} className="comment">
 											<div className="comment-header">
 												<span className="comment-author">{comment.nom_utilisateur}</span>
@@ -267,7 +278,9 @@ function Saveurs() {
 											{currentUser?.id_utilisateur === comment.id_utilisateur && (
 												<div className="comment-actions">
 													<button onClick={() => handleEditComment(comment)}>Modifier</button>
-													<button onClick={() => handleDeleteComment(comment.id_commentaire)}>Supprimer</button>
+													<button onClick={() => handleDeleteComment(comment.id_commentaire)}>
+														Supprimer
+													</button>
 												</div>
 											)}
 										</div>
