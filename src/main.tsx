@@ -1,5 +1,7 @@
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
 import "./index.css";
 import axios from "axios";
 
@@ -7,6 +9,24 @@ import App from "./App.tsx";
 
 import Home from "./pages/Home.tsx";
 import Saveurs from "./pages/Saveurs.tsx";
+
+// Configuration du thème Material-UI
+const theme = createTheme({
+	palette: {
+		primary: {
+			main: '#1976d2',
+		},
+		secondary: {
+			main: '#dc004e',
+		},
+		background: {
+			default: '#f5f7fa',
+		},
+	},
+	typography: {
+		fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+	},
+});
 
 // Configuration d'Axios
 const axiosInstance = axios.create({
@@ -58,5 +78,10 @@ const router = createBrowserRouter([
 const rootElement = document.getElementById("root");
 
 if (rootElement != null) {
-	ReactDOM.createRoot(rootElement).render(<RouterProvider router={router} />);
+	ReactDOM.createRoot(rootElement).render(
+		<ThemeProvider theme={theme}>
+			<CssBaseline />
+			<RouterProvider router={router} />
+		</ThemeProvider>
+	);
 }
